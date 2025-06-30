@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -21,6 +22,7 @@
       background: white;
       border-radius: 6px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      padding: 1rem;
     }
     table {
       width: 100%;
@@ -36,9 +38,6 @@
     th {
       background-color: #fce8b2;
       color: #333;
-    }
-    td[contenteditable="true"] {
-      background-color: #fefefe;
     }
     input.text-input, input.number-input {
       width: 100%;
@@ -102,12 +101,14 @@
     }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
   <h2>📦 FoodBunny Delivery Sheet</h2>
 
-  <div class="table-container">
+  <div class="table-container" id="tableContainer">
     <table id="deliveryTable">
       <thead>
         <tr>
@@ -124,8 +125,8 @@
           <td><input class="text-input" type="text" value="Ali Khan" /></td>
           <td><input class="text-input" type="text" value="Chakwal City" /></td>
           <td><input class="text-input" type="text" value="Grocery Items" /></td>
-          <td><input class="number-input" type="number" value="03001234567" /></td>
-          <td><div class="currency-wrapper"><span>Rs.</span><input class="number-input" type="number" value="100" oninput="this.value = this.value.replace(/[^0-9]/g, '')" /></div></td>
+          <td><input class="number-input" type="text" inputmode="numeric" pattern="[0-9]*" value="03001234567" /></td>
+          <td><div class="currency-wrapper"><span>Rs.</span><input class="number-input" type="text" inputmode="numeric" pattern="[0-9]*" value="100" /></div></td>
           <td class="no-export"><button class="delete-btn" onclick="deleteRow(this)">❌</button></td>
         </tr>
       </tbody>
@@ -139,20 +140,19 @@
     <a class="whatsapp-btn" id="whatsappShare" target="_blank">📤 Share on WhatsApp</a>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
   <script>
     function addRow() {
       const table = document.getElementById("deliveryTable").getElementsByTagName('tbody')[0];
-      const row = table.insertRow();
-
-      row.insertCell(0).outerHTML = '<td><input class="text-input" type="text" /></td>';
-      row.insertCell(1).outerHTML = '<td><input class="text-input" type="text" /></td>';
-      row.insertCell(2).outerHTML = '<td><input class="text-input" type="text" /></td>';
-      row.insertCell(3).outerHTML = '<td><input class="number-input" type="number" /></td>';
-      row.insertCell(4).outerHTML = '<td><div class="currency-wrapper"><span>Rs.</span><input class="number-input" type="number" value="100" oninput="this.value = this.value.replace(/[^0-9]/g, '')" /></div></td>';
-      row.insertCell(5).outerHTML = '<td class="no-export"><button class="delete-btn" onclick="deleteRow(this)">❌</button></td>';
+      const newRow = document.createElement("tr");
+      newRow.innerHTML = `
+        <td><input class="text-input" type="text" /></td>
+        <td><input class="text-input" type="text" /></td>
+        <td><input class="text-input" type="text" /></td>
+        <td><input class="number-input" type="text" inputmode="numeric" pattern="[0-9]*" /></td>
+        <td><div class="currency-wrapper"><span>Rs.</span><input class="number-input" type="text" inputmode="numeric" pattern="[0-9]*" value="100" /></div></td>
+        <td class="no-export"><button class="delete-btn" onclick="deleteRow(this)">❌</button></td>
+      `;
+      table.appendChild(newRow);
     }
 
     function deleteRow(btn) {
@@ -160,47 +160,57 @@
       row.remove();
     }
 
-    async function downloadPDF() {
+    function downloadPDF() {
       const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      const table = document.getElementById("deliveryTable").cloneNode(true);
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const tableEl = document.getElementById("deliveryTable").cloneNode(true);
 
-      table.querySelectorAll(".no-export").forEach(el => el.remove());
-      table.querySelectorAll("input").forEach(input => {
+      tableEl.querySelectorAll(".no-export").forEach(el => el.remove());
+      tableEl.querySelectorAll("input").forEach(input => {
         const td = input.parentNode;
-        const isCurrency = td.querySelector('span');
-        td.textContent = isCurrency ? `Rs.${input.value}` : input.value;
+        const value = input.value;
+        td.textContent = td.querySelector('span') ? `Rs.${value}` : value;
       });
 
-      await html2canvas(table).then(canvas => {
-        const imgData = canvas.toDataURL('image/png');
+      const wrapper = document.createElement("div");
+      wrapper.style.padding = "20px";
+      wrapper.style.background = "white";
+      wrapper.appendChild(tableEl);
+      document.body.appendChild(wrapper);
+
+      html2canvas(wrapper).then(canvas => {
+        const imgData = canvas.toDataURL("image/png");
         const imgProps = doc.getImageProperties(imgData);
         const pdfWidth = doc.internal.pageSize.getWidth();
         const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
         doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
         doc.save("FoodBunny-Delivery-Sheet.pdf");
+        document.body.removeChild(wrapper);
       });
     }
 
     function downloadImage() {
-      const table = document.getElementById("deliveryTable").cloneNode(true);
-      table.querySelectorAll(".no-export").forEach(el => el.remove());
-      table.querySelectorAll("input").forEach(input => {
+      const tableEl = document.getElementById("deliveryTable").cloneNode(true);
+
+      tableEl.querySelectorAll(".no-export").forEach(el => el.remove());
+      tableEl.querySelectorAll("input").forEach(input => {
         const td = input.parentNode;
-        const isCurrency = td.querySelector('span');
-        td.textContent = isCurrency ? `Rs.${input.value}` : input.value;
+        const value = input.value;
+        td.textContent = td.querySelector('span') ? `Rs.${value}` : value;
       });
 
-      const container = document.createElement("div");
-      container.appendChild(table);
-      document.body.appendChild(container);
+      const wrapper = document.createElement("div");
+      wrapper.style.padding = "20px";
+      wrapper.style.background = "white";
+      wrapper.appendChild(tableEl);
+      document.body.appendChild(wrapper);
 
-      html2canvas(container).then(canvas => {
+      html2canvas(wrapper, { scale: 3 }).then(canvas => {
         const link = document.createElement("a");
         link.download = "FoodBunny-Delivery-Sheet.png";
         link.href = canvas.toDataURL();
         link.click();
-        document.body.removeChild(container);
+        document.body.removeChild(wrapper);
       });
     }
 
@@ -213,6 +223,5 @@
       window.open(url, '_blank');
     });
   </script>
-
 </body>
 </html>
